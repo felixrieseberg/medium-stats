@@ -1,16 +1,19 @@
 {
-  "name": "stats",
+  "name": "medium-stats",
   "version": "1.0.0",
-  "description": "",
+  "description": "Gather statistic from your Medium publication",
   "main": "src/index.js",
   "bin": "src/index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "Medium"
+  ],
+  "scripts": {
+    "lint": "npx prettier --write \"src/*.js\""
+  },
+  "author": "Felix Rieseberg <felix@felixrieseberg.com>",
+  "license": "MIT",
   "dependencies": {
     "csv-stringify": "^5.3.6",
-    "fs-extra": "^8.1.0",
-    "json2csv": "^4.5.4",
     "puppeteer-core": "^2.1.1",
     "table": "^5.4.6"
   }

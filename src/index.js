@@ -1,10 +1,11 @@
-const puppeteer = require('puppeteer-core');
-const fs = require('fs');
-const path = require('path');
-const { table } = require('table');
-const stringify = require('csv-stringify')
+const puppeteer = require("puppeteer-core");
+const fs = require("fs");
+const path = require("path");
+const { table } = require("table");
+const stringify = require("csv-stringify");
 
-const { prompt } = require('./prompt')
+const { prompt } = require("./prompt");
+const { findExecutable } = require("./executable");
 
 const urlPromptText = `
 Please enter the URL to your Medium statistics page. Examples:
@@ -15,7 +16,7 @@ Please enter the URL to your Medium statistics page. Examples:
 async function getTargetUrl() {
   const input = process.argv[process.argv.length - 1];
 
-  if (input.startsWith('http')) {
+  if (input.startsWith("http")) {
     return input;
   } else {
     return prompt(urlPromptText);
@@ -25,7 +26,7 @@ async function getTargetUrl() {
 async function getTargetUrl() {
   const input = process.argv[process.argv.length - 1];
 
-  if (input.startsWith('http')) {
+  if (input.startsWith("http")) {
     return input;
   } else {
     return prompt(urlPromptText);
@@ -33,82 +34,77 @@ async function getTargetUrl() {
 }
 
 async function getLinks(page) {
-  return page.$$eval('a', (links) => {
-    return links
-      .filter((a) => a.textContent === 'Details')
-      .map((a) => a.href)
+  return page.$$eval("a", links => {
+    return links.filter(a => a.textContent === "Details").map(a => a.href);
   });
 }
 
 async function getStats(page) {
-  return page.$$eval('h2', (elements) => {
-    let externalRefHeader = [...elements].find((h2) => {
-      return h2.textContent === 'External referrals'
-    })
-    let externalRefDiv = externalRefHeader.parentElement.parentElement
-    let externalRows = [...externalRefDiv.children]
+  return page.$$eval("h2", elements => {
+    let externalRefHeader = [...elements].find(h2 => {
+      return h2.textContent === "External referrals";
+    });
+    let externalRefDiv = externalRefHeader.parentElement.parentElement;
+    let externalRows = [...externalRefDiv.children];
 
     // Remove the first one
-    externalRows.splice(0, 1)
+    externalRows.splice(0, 1);
 
-    const data = {}
+    const data = {};
 
     for (const child of externalRows) {
-      const title = child.children[0].textContent
-      const num = child.children[1].children[0].textContent
-      let finalNum = num
+      const title = child.children[0].textContent;
+      const num = child.children[1].children[0].textContent;
+      let finalNum = num;
 
-      if (num.includes('.')) {
-        finalNum = finalNum.replace('.', '')
-        finalNum = finalNum.replace('K', '00')
+      if (num.includes(".")) {
+        finalNum = finalNum.replace(".", "");
+        finalNum = finalNum.replace("K", "00");
       } else {
-        finalNum = finalNum.replace('K', '000')
+        finalNum = finalNum.replace("K", "000");
       }
 
       data[title] = (data[title] || 0) + parseInt(finalNum, 10);
     }
 
-    return data
-  })
+    return data;
+  });
 }
 
 async function awaitUrl(page, url) {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     console.log(`Now waiting for browser to reach ${url}. Please sign in!`);
 
     const interval = setInterval(async () => {
       const pageUrl = page.url();
 
       if (pageUrl === url) {
-        process.stdout.write('');
+        process.stdout.write("");
         console.log(`Reached target url ${url}`);
         clearInterval(interval);
         resolve();
       }
     }, 750);
-  })
+  });
 }
 
 function getSingleTable(data) {
   const rows = [];
 
   for (const key of Object.keys(data)) {
-    rows.push([key, data[key]])
+    rows.push([key, data[key]]);
   }
 
-  return [
-    ['Source', 'Visits'],
-    ...rows,
-  ]
+  return [["Source", "Visits"], ...rows];
 }
 
 function getTable(data) {
   const rows = [];
 
   for (const key of Object.keys(data)) {
-    rows.push([key.toUpperCase(), '']);
+    rows.push([key.toUpperCase(), ""]);
     rows.push(...getSingleTable(data[key]));
-    rows.push(['','']);
+    rows.push(["", ""]);
   }
 
   return rows;
@@ -122,8 +118,8 @@ async function getCsv(table) {
       }
 
       resolve(output);
-    })
-  })
+    });
+  });
 }
 
 async function main() {
@@ -142,7 +138,7 @@ async function main() {
   await page.goto(targetUrl);
   await awaitUrl(page, targetUrl);
 
-  console.log(`Found target page ${targetUrl}`)
+  console.log(`Found target page ${targetUrl}`);
 
   const links = await getLinks(page);
   let i = 0;
@@ -150,7 +146,7 @@ async function main() {
 
   for (const link of links) {
     await page.goto(link);
-    await page.waitForXPath('//h2[text()="External referrals"]')
+    await page.waitForXPath('//h2[text()="External referrals"]');
     const stats = await getStats(page);
 
     data[link] = stats;
@@ -160,23 +156,28 @@ async function main() {
     }
 
     i++;
-    console.log(`${i}/${links.length} Processed ${link}`)
+    console.log(`${i}/${links.length} Processed ${link}`);
   }
 
   await browser.close();
 
-
-  data['Totals'] = totals;
+  data["Totals"] = totals;
 
   const tableData = getTable(data);
 
-  console.log(`\n We're done!\n`)
+  console.log(`\n We're done!\n`);
   console.log(table(tableData));
 
-  fs.writeFileSync(path.join(process.cwd(), 'medium_result.json'), JSON.stringify(data, undefined, 2));
-  fs.writeFileSync(path.join(process.cwd(), 'medium_result.csv'), await getCsv(tableData));
+  fs.writeFileSync(
+    path.join(process.cwd(), "medium_result.json"),
+    JSON.stringify(data, undefined, 2)
+  );
+  fs.writeFileSync(
+    path.join(process.cwd(), "medium_result.csv"),
+    await getCsv(tableData)
+  );
 
-  console.log(`Results saved to medium_results.json and medium_results.csv`)
+  console.log(`Results saved to medium_results.json and medium_results.csv`);
 }
 
-main()
+main();
