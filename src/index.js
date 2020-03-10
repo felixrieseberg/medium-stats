@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const puppeteer = require("puppeteer-core");
 const fs = require("fs");
 const path = require("path");
